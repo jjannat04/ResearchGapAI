@@ -1,8 +1,6 @@
 # ResearchGap AI Documentation
 Live link: 
-```text
 [Research Gap AI](https://research-gap-ai.web.app/) website.
-```
 
 ## Problem Statement
 
