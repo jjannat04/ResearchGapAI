@@ -11,7 +11,7 @@ from google.genai import types
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-3-flash"
 MAX_TOTAL_CHARS_TO_GEMINI = 30000
 TRUNCATION_MARKER = "\n[Text truncated before Gemini analysis.]"
 
