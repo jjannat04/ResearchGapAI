@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -14,9 +15,16 @@ load_dotenv(dotenv_path=ENV_PATH)
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 MAX_TOTAL_CHARS_TO_GEMINI = 30000
 TRUNCATION_MARKER = "\n[Text truncated before Gemini analysis.]"
+RATE_LIMIT_MESSAGE = "The AI service is currently experiencing high demand. Please try again in a few minutes."
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisError(RuntimeError):
+    pass
+
+
+class GeminiRateLimitError(AnalysisError):
     pass
 
 
@@ -99,13 +107,21 @@ def analyze_papers(texts: list[str]) -> dict[str, list]:
             ),
         )
     except genai_errors.ClientError as exc:
-        raise AnalysisError(f"Gemini request failed: {exc}") from exc
+        logger.exception("Gemini client request failed.")
+        if _is_rate_limit_error(exc):
+            raise GeminiRateLimitError(RATE_LIMIT_MESSAGE) from exc
+        raise AnalysisError("Gemini request failed. Please try again later.") from exc
     except genai_errors.ServerError as exc:
+        logger.exception("Gemini service returned a server error.")
         raise AnalysisError("Gemini service is temporarily unavailable. Try again shortly.") from exc
     except genai_errors.APIError as exc:
-        raise AnalysisError(f"Gemini API error: {exc}") from exc
+        logger.exception("Gemini API request failed.")
+        if _is_rate_limit_error(exc):
+            raise GeminiRateLimitError(RATE_LIMIT_MESSAGE) from exc
+        raise AnalysisError("Gemini API error. Please try again later.") from exc
     except Exception as exc:
-        raise AnalysisError(f"Gemini analysis failed: {type(exc).__name__}.") from exc
+        logger.exception("Unexpected Gemini analysis failure.")
+        raise AnalysisError("Gemini analysis failed. Please try again later.") from exc
 
     try:
         data = json.loads(response.text or "")
@@ -157,6 +173,22 @@ def _limit_total_text(texts: list[str]) -> list[str]:
             limited.append(text[: per_paper_limit - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER)
 
     return limited
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if str(status_code) == "429":
+        return True
+
+    reason = str(getattr(exc, "status", "") or getattr(exc, "reason", "") or "").upper()
+    message = str(exc).lower()
+    return (
+        "resource_exhausted" in reason
+        or "rate limit" in message
+        or "quota" in message
+        or "resource exhausted" in message
+        or "too many requests" in message
+    )
 
 
 def _validate_analysis(data: Any) -> dict[str, list]:

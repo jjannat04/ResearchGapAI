@@ -13,6 +13,7 @@ import {
   Sparkles,
   UploadCloud,
   WandSparkles,
+  Zap,
 } from "lucide-react";
 import type { ChangeEvent, DragEvent, FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -301,6 +302,12 @@ export default function Home() {
             <small id="upload-help" className="relative mt-3 max-w-md text-sm leading-6 text-slate-500">
               Drag and drop up to 3 research papers, or browse from your device. Selectable-text PDFs work best.
             </small>
+            <div className="relative mt-4 flex max-w-md items-start gap-2 rounded-2xl border border-blue-100 bg-white/75 px-3 py-2 text-left text-xs leading-5 text-slate-500 shadow-sm">
+              <Zap className="mt-0.5 size-3.5 shrink-0 text-blue-500" aria-hidden="true" />
+              <span>
+                Demo version powered by Gemini API free tier. Response times may vary during high usage or with very large files.
+              </span>
+            </div>
           </label>
 
           <input

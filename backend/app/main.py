@@ -1,8 +1,13 @@
+import logging
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services.analyzer import AnalysisError, analyze_papers
+from app.services.analyzer import AnalysisError, GeminiRateLimitError, analyze_papers
 from app.services.pdf_utils import PDFExtractionError, extract_pdf_text
+
+logger = logging.getLogger(__name__)
+AI_ANALYSIS_ERROR_MESSAGE = "The AI service could not complete the analysis. Please try again later."
 
 app = FastAPI(title="ResearchGap AI API", version="0.1.0")
 
@@ -58,8 +63,12 @@ async def analyze(files: list[UploadFile] = File(...)) -> dict[str, object]:
 
     try:
         analysis = analyze_papers([paper["text"] for paper in extracted_papers])
+    except GeminiRateLimitError as exc:
+        logger.warning("Gemini API rate limit reached.", exc_info=True)
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except AnalysisError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.exception("AI analysis failed.")
+        raise HTTPException(status_code=502, detail=AI_ANALYSIS_ERROR_MESSAGE) from exc
 
     return {"extracted_papers": extracted_papers, **analysis}
 
