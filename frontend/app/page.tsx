@@ -1,0 +1,516 @@
+"use client";
+
+import {
+  AlertTriangle,
+  ArrowRight,
+  Brain,
+  CheckCircle2,
+  Cloud,
+  FileText,
+  Lightbulb,
+  Loader2,
+  Server,
+  Sparkles,
+  UploadCloud,
+  WandSparkles,
+} from "lucide-react";
+import type { ChangeEvent, DragEvent, FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type Summary = {
+  title: string;
+  objective: string;
+  methodology: string;
+  findings: string;
+};
+
+type ExtractedPaper = {
+  filename: string;
+  text: string;
+};
+
+type ComparisonRow = {
+  paper: string;
+  objective: string;
+  methodology: string;
+  dataset_or_scope: string;
+  key_findings: string;
+  limitations: string;
+};
+
+type AnalysisResponse = {
+  extracted_papers: ExtractedPaper[];
+  summaries: Summary[];
+  comparison_table: ComparisonRow[];
+  research_gaps: string[];
+  novel_ideas: string[];
+};
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const loadingMessages = [
+  "Reading papers...",
+  "Extracting insights...",
+  "Comparing methodologies...",
+  "Finding research gaps...",
+  "Generating novel ideas...",
+];
+
+export default function Home() {
+  const [files, setFiles] = useState<File[]>([]);
+  const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const canAnalyze = useMemo(() => files.length > 0 && files.length <= 3 && !loading, [files, loading]);
+  const uploadProgress = Math.min((files.length / 3) * 100, 100);
+
+  useEffect(() => {
+    if (!loading) {
+      setMessageIndex(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setMessageIndex((current) => (current + 1) % loadingMessages.length);
+    }, 1600);
+
+    return () => window.clearInterval(interval);
+  }, [loading]);
+
+  function selectFiles(selectedFiles: File[]) {
+    const selected = selectedFiles.filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
+    setResult(null);
+    setError("");
+
+    if (selected.length !== selectedFiles.length) {
+      setError("Only PDF files can be uploaded.");
+    }
+
+    if (!selected.length) {
+      setFiles([]);
+      return;
+    }
+
+    if (selected.length > 3) {
+      setFiles(selected.slice(0, 3));
+      setError("Maximum 3 PDFs allowed. The first 3 files were selected.");
+      return;
+    }
+
+    setFiles(selected);
+  }
+
+  function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    selectFiles(Array.from(event.target.files ?? []));
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(false);
+    selectFiles(Array.from(event.dataTransfer.files));
+  }
+
+  function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(true);
+  }
+
+  function handleDragLeave() {
+    setDragging(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setResult(null);
+
+    if (!canAnalyze) {
+      setError("Select at least 1 PDF before analyzing.");
+      return;
+    }
+
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/analyze`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? "Analysis failed.");
+      }
+
+      setResult(await response.json());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen overflow-hidden">
+      <div className="border-b border-blue-100/70 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            <span>Powered by Gemini API</span>
+          </div>
+          <div className="flex items-center gap-2 text-blue-50">
+            <Cloud className="size-3.5" aria-hidden="true" />
+            <span>Deployed on Google Cloud Run</span>
+          </div>
+        </div>
+      </div>
+
+      <nav className="sticky top-0 z-20 border-b border-blue-100/80 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-sm font-black text-white shadow-lg shadow-blue-600/25">
+              RG
+            </div>
+            <div>
+              <p className="text-sm font-bold tracking-tight text-slate-950">ResearchGap AI</p>
+              <p className="text-xs font-medium text-slate-500">PDF intelligence dashboard</p>
+            </div>
+          </div>
+          <div className="hidden items-center gap-7 text-sm font-semibold text-slate-600 md:flex" aria-label="Primary navigation">
+            <a className="rounded-full px-2 py-1 transition hover:bg-blue-50 hover:text-blue-700" href="#upload">
+              Upload
+            </a>
+            <a className="rounded-full px-2 py-1 transition hover:bg-blue-50 hover:text-blue-700" href="#dashboard">
+              Dashboard
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <section className="relative mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-14">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.22),transparent_34rem)]" />
+        <div className="flex flex-col justify-center">
+          <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700 shadow-sm">
+            <Sparkles className="size-4" aria-hidden="true" />
+            AI research copilot
+          </div>
+          <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl lg:leading-[1.02]">
+            Turn papers into research direction.
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
+            Upload your PDFs and get concise summaries, side-by-side comparison, high-signal gaps, and novel ideas ready
+            for a hackathon demo or research pitch.
+          </p>
+        </div>
+
+        <form
+          id="upload"
+          className="rounded-[2rem] border border-blue-100 bg-white/95 p-4 shadow-2xl shadow-blue-950/10 backdrop-blur sm:p-6"
+          onSubmit={handleSubmit}
+          aria-describedby="upload-help"
+        >
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide text-blue-600">Upload workspace</p>
+              <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950">Analyze your papers</h2>
+            </div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">
+              {files.length}/3 PDFs
+            </div>
+          </div>
+
+          <label
+            className={`group relative flex min-h-80 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border p-8 text-center transition duration-300 ${
+              dragging
+                ? "scale-[1.01] border-blue-500 bg-blue-50 shadow-inner"
+                : "border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 hover:-translate-y-1 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-950/10"
+            }`}
+            htmlFor="pdfs"
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            aria-label="Drag and drop PDF files or choose files"
+          >
+            <div className="absolute inset-x-10 top-8 h-20 rounded-full bg-blue-400/10 blur-3xl transition group-hover:bg-blue-500/20" />
+            <div className="relative mb-6 grid size-20 place-items-center rounded-3xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-2xl shadow-blue-600/30 transition duration-300 group-hover:-translate-y-1 group-hover:scale-105">
+              <UploadCloud className="size-9" aria-hidden="true" />
+            </div>
+            <span className="relative text-2xl font-extrabold tracking-tight text-slate-950">Drop PDFs to begin</span>
+            <small id="upload-help" className="relative mt-3 max-w-md text-sm leading-6 text-slate-500">
+              Drag and drop up to 3 research papers, or browse from your device. Selectable-text PDFs work best.
+            </small>
+          </label>
+
+          <input
+            ref={fileInputRef}
+            id="pdfs"
+            className="hidden"
+            type="file"
+            accept="application/pdf"
+            multiple
+            onChange={handleFiles}
+          />
+
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500">
+              <span>Upload progress</span>
+              <span>{files.length} of 3 selected</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-blue-50" role="progressbar" aria-valuemin={0} aria-valuemax={3} aria-valuenow={files.length}>
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-400 transition-all duration-500"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+
+          {files.length > 0 && (
+            <div className="mt-5 grid gap-3">
+              {files.map((file) => (
+                <div
+                  className="group flex items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                  key={`${file.name}-${file.size}`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid size-10 place-items-center rounded-2xl bg-blue-50 text-blue-700">
+                      <FileText className="size-5" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900">{file.name}</p>
+                      <p className="text-xs text-slate-500">{Math.round(file.size / 1024).toLocaleString()} KB</p>
+                    </div>
+                  </div>
+                  <CheckCircle2 className="size-5 shrink-0 text-blue-600" aria-label="Selected" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800" role="alert" aria-live="polite">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+            >
+              Choose PDFs
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
+              disabled={!canAnalyze}
+              aria-disabled={!canAnalyze}
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <WandSparkles className="size-4" aria-hidden="true" />}
+              {loading ? "Analyzing..." : "Analyze Papers"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="dashboard" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        {loading && <LoadingState message={loadingMessages[messageIndex]} />}
+
+        {!loading && !result && (
+          <EmptyDashboard />
+        )}
+
+        {result && (
+          <div className="grid gap-8" aria-live="polite">
+            <ResultBlock eyebrow="Section 1" title="Paper Summaries">
+              <div className="grid gap-5 lg:grid-cols-3">
+                {result.summaries.map((summary) => (
+                  <article
+                    className="rounded-[1.75rem] border border-blue-100 bg-white p-6 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10"
+                    key={summary.title}
+                  >
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <h3 className="text-lg font-extrabold tracking-tight text-slate-950">{summary.title}</h3>
+                      <Brain className="size-5 shrink-0 text-blue-600" aria-hidden="true" />
+                    </div>
+                    <SummaryItem label="Objective">{summary.objective}</SummaryItem>
+                    <SummaryItem label="Methodology">{summary.methodology}</SummaryItem>
+                    <SummaryItem label="Findings">{summary.findings}</SummaryItem>
+                  </article>
+                ))}
+              </div>
+            </ResultBlock>
+
+            <ResultBlock eyebrow="Section 2" title="Comparison Table">
+              <div className="overflow-hidden rounded-[1.75rem] border border-blue-100 bg-white shadow-lg shadow-blue-950/5">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[980px] border-collapse text-left text-sm">
+                    <thead className="bg-blue-600 text-xs uppercase text-white">
+                      <tr>
+                        <th className="px-5 py-4 font-bold">Paper</th>
+                        <th className="px-5 py-4 font-bold">Objective</th>
+                        <th className="px-5 py-4 font-bold">Methodology</th>
+                        <th className="px-5 py-4 font-bold">Dataset / Scope</th>
+                        <th className="px-5 py-4 font-bold">Key Findings</th>
+                        <th className="px-5 py-4 font-bold">Limitations</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-blue-50">
+                      {result.comparison_table.map((row) => (
+                        <tr className="align-top transition hover:bg-blue-50/60" key={row.paper}>
+                          <td className="px-5 py-4 font-bold text-slate-950">{row.paper}</td>
+                          <td className="px-5 py-4 text-slate-600">{row.objective}</td>
+                          <td className="px-5 py-4 text-slate-600">{row.methodology}</td>
+                          <td className="px-5 py-4 text-slate-600">{row.dataset_or_scope}</td>
+                          <td className="px-5 py-4 text-slate-600">{row.key_findings}</td>
+                          <td className="px-5 py-4 text-slate-600">{row.limitations}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </ResultBlock>
+
+            <ResultBlock eyebrow="Section 3" title="Research Gaps">
+              <div className="grid gap-4 md:grid-cols-2">
+                {result.research_gaps.map((gap, index) => (
+                  <article
+                    className="group rounded-[1.75rem] border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-6 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-amber-950/10"
+                    key={gap}
+                  >
+                    <div className="mb-5 flex items-center justify-between">
+                      <div className="grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-700 transition group-hover:scale-105">
+                        {index % 2 === 0 ? <AlertTriangle className="size-6" aria-hidden="true" /> : <Lightbulb className="size-6" aria-hidden="true" />}
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-wide text-amber-700">Gap {index + 1}</span>
+                    </div>
+                    <p className="text-sm leading-7 text-slate-700">{gap}</p>
+                  </article>
+                ))}
+              </div>
+            </ResultBlock>
+
+            <ResultBlock eyebrow="Section 4" title="Novel Research Ideas">
+              <div className="grid gap-5 lg:grid-cols-2">
+                {result.novel_ideas.map((idea, index) => (
+                  <article
+                    className="group relative overflow-hidden rounded-[1.75rem] border border-blue-100 bg-slate-950 p-6 text-white shadow-2xl shadow-blue-950/15 transition duration-300 hover:-translate-y-1 hover:shadow-blue-950/25"
+                    key={idea}
+                  >
+                    <div className="absolute right-0 top-0 size-36 rounded-full bg-blue-500/20 blur-3xl transition group-hover:bg-blue-400/30" />
+                    <div className="relative mb-6 flex items-center justify-between">
+                      <div className="grid size-12 place-items-center rounded-2xl bg-white/10 text-blue-200">
+                        <Sparkles className="size-6" aria-hidden="true" />
+                      </div>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-blue-100">Idea {index + 1}</span>
+                    </div>
+                    <p className="relative text-base leading-8 text-blue-50">{idea}</p>
+                    <div className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-blue-200">
+                      Explore direction <ArrowRight className="size-4 transition group-hover:translate-x-1" aria-hidden="true" />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </ResultBlock>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function ResultBlock({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
+  return (
+    <section>
+      <div className="mb-4">
+        <p className="text-sm font-bold uppercase tracking-wide text-blue-600">{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyDashboard() {
+  return (
+    <section className="rounded-[2rem] border border-dashed border-blue-200 bg-white/80 p-6 shadow-sm shadow-blue-950/5 sm:p-8">
+      <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+        <div>
+          <div className="mb-5 grid size-14 place-items-center rounded-3xl bg-blue-50 text-blue-700">
+            <Server className="size-7" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-bold uppercase tracking-wide text-blue-600">Dashboard preview</p>
+          <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">Your analysis will appear here.</h2>
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Upload at least one PDF to generate paper summaries, a comparison table, research gaps, and novel research ideas.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {["Paper summaries", "Comparison table", "Research gaps", "Novel ideas"].map((item) => (
+            <div className="rounded-3xl border border-blue-100 bg-blue-50/50 p-5" key={item}>
+              <div className="mb-4 h-2 w-12 rounded-full bg-blue-200" />
+              <p className="font-bold text-slate-800">{item}</p>
+              <p className="mt-2 text-sm text-slate-500">Ready after analysis</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryItem({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-5 rounded-2xl bg-blue-50/60 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-blue-700">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{children}</p>
+    </div>
+  );
+}
+
+function LoadingState({ message }: { message: string }) {
+  return (
+    <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl shadow-blue-950/10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="relative grid size-16 place-items-center rounded-3xl bg-blue-600 text-white shadow-xl shadow-blue-600/25">
+            <Loader2 className="size-8 animate-spin" aria-hidden="true" />
+            <span className="absolute inset-0 animate-ping rounded-3xl bg-blue-500/20" />
+          </div>
+          <div>
+            <p className="text-lg font-extrabold text-slate-950">{message}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              ResearchGap AI is building your structured dashboard.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">
+          Premium analysis in progress
+        </div>
+      </div>
+
+      <div className="mt-6 h-2 overflow-hidden rounded-full bg-blue-50">
+        <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600" />
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div className="rounded-3xl border border-blue-50 bg-blue-50/50 p-5" key={index}>
+            <div className="h-4 w-2/3 animate-pulse rounded-full bg-blue-100" />
+            <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-blue-100" />
+            <div className="mt-2 h-3 w-5/6 animate-pulse rounded-full bg-blue-100" />
+            <div className="mt-2 h-3 w-4/6 animate-pulse rounded-full bg-blue-100" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

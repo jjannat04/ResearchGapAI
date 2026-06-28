@@ -1,0 +1,10 @@
+{
+  "name": "researchgap-ai",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "install:frontend": "npm --prefix frontend install"
+  }
+}
