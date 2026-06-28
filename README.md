@@ -1,4 +1,8 @@
 # ResearchGap AI Documentation
+Live link: 
+```text
+https://research-gap-ai.vercel.app/
+```
 
 ## Problem Statement
 
@@ -19,6 +23,8 @@ The goal is to make early-stage literature review faster, clearer, and more usef
 ResearchGap AI is a full-stack web application with a Next.js frontend and FastAPI backend.
 
 The user uploads PDFs through a modern drag-and-drop interface. The backend validates the PDFs, extracts selectable text with `pypdf`, limits the total text sent to the AI model, and sends the extracted content to Gemini for structured analysis.
+
+![App Screenshot](screenshot.png)
 
 The frontend displays the result as a professional dashboard with separate sections for paper summaries, comparison, research gaps, and novel ideas. To keep the experience responsive, the frontend avoids rendering raw extracted text and progressively reveals analysis sections.
 
@@ -80,12 +86,6 @@ The backend reads the API key from:
 backend/.env
 ```
 
-Expected environment variables:
-
-```text
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
 
 ## Best Use of Gemini API
 
@@ -172,13 +172,13 @@ npm run dev
 The frontend API URL can be configured with:
 
 ```text
-NEXT_PUBLIC_API_URL=https://your-backend-url
+NEXT_PUBLIC_API_URL=(https://researchgap-backend.onrender.com)
 ```
 
 Current frontend default:
 
 ```text
-https://researchgap-backend.onrender.com
+https://research-gap-ai.vercel.app/
 ```
 
 For Google Cloud Run deployment, the backend should be deployed as a containerized FastAPI service with `GEMINI_API_KEY` configured as a secure environment variable.
