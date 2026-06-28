@@ -80,12 +80,6 @@ The backend reads the API key from:
 backend/.env
 ```
 
-Expected environment variables:
-
-```text
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
 
 ## Best Use of Gemini API
 
@@ -172,13 +166,13 @@ npm run dev
 The frontend API URL can be configured with:
 
 ```text
-NEXT_PUBLIC_API_URL=https://your-backend-url
+NEXT_PUBLIC_API_URL=(https://researchgap-backend.onrender.com)
 ```
 
 Current frontend default:
 
 ```text
-https://researchgap-backend.onrender.com
+https://research-gap-ai.vercel.app/
 ```
 
 For Google Cloud Run deployment, the backend should be deployed as a containerized FastAPI service with `GEMINI_API_KEY` configured as a secure environment variable.
