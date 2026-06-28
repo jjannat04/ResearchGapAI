@@ -209,7 +209,7 @@ export default function Home() {
       <div className="border-b border-blue-100/70 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-3.5" aria-hidden="true" />
+            
             <span>Powered by Gemini API</span>
           </div>
           <div className="flex items-center gap-2 text-blue-50">
@@ -245,7 +245,7 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.22),transparent_34rem)]" />
         <div className="flex flex-col justify-center">
           <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700 shadow-sm">
-            <Sparkles className="size-4" aria-hidden="true" />
+            
             AI research copilot
           </div>
           <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl lg:leading-[1.02]">
@@ -482,7 +482,7 @@ export default function Home() {
                     <div className="absolute right-0 top-0 size-36 rounded-full bg-blue-500/20 blur-3xl transition group-hover:bg-blue-400/30" />
                     <div className="relative mb-6 flex items-center justify-between">
                       <div className="grid size-12 place-items-center rounded-2xl bg-white/10 text-blue-200">
-                        <Sparkles className="size-6" aria-hidden="true" />
+                        
                       </div>
                       <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-blue-100">Idea {index + 1}</span>
                     </div>
