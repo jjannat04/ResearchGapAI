@@ -19,7 +19,7 @@ The goal is to make early-stage literature review faster, clearer, and more usef
 ResearchGap AI is a full-stack web application with a Next.js frontend and FastAPI backend.
 
 The user uploads PDFs through a modern drag-and-drop interface. The backend validates the PDFs, extracts selectable text with `pypdf`, limits the total text sent to the AI model, and sends the extracted content to Gemini for structured analysis.
-
+![App Screenshot](screenshot.png)
 The frontend displays the result as a professional dashboard with separate sections for paper summaries, comparison, research gaps, and novel ideas. To keep the experience responsive, the frontend avoids rendering raw extracted text and progressively reveals analysis sections.
 
 ## Technologies Used
