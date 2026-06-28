@@ -398,7 +398,7 @@ export default function Home() {
 
             {summaries.length > 0 && (
             <ResultBlock eyebrow="Section 1" title="Paper Summaries">
-              <div className="grid gap-5 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
                 {summaries.map((summary) => (
                   <article
                     className="rounded-[1.75rem] border border-blue-100 bg-white p-6 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10"
