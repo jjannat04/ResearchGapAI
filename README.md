@@ -1,8 +1,6 @@
 # ResearchGap AI Documentation
 Live link: 
-```text
-https://research-gap-ai.vercel.app/
-```
+[Research Gap AI](https://research-gap-ai.web.app/) website.
 
 ## Problem Statement
 
@@ -133,6 +131,11 @@ The prompt explicitly instructs Gemini to return valid JSON only. The backend al
 
 This is a strong use of Gemini because the application depends on semantic reasoning, synthesis, and research-aware comparison rather than basic keyword matching. Gemini transforms unstructured academic text into structured, actionable research insights.
 
+
+## Google Cloud Deployment
+
+ResearchGap AI uses a production-ready architecture with its Next.js frontend deployed on **Firebase** Hosting, leveraging Google's global infrastructure for fast and reliable delivery. The platform integrates the **Gemini API** to analyze uploaded research papers and automatically identify potential research gaps. Its modular frontend-backend design enables independent scaling and future expansion to additional Google Cloud services such as Cloud Run and Cloud Storage.
+
 ## Prompt and JSON Structure
 
 The backend sends Gemini a prompt that includes:
@@ -208,7 +211,7 @@ NEXT_PUBLIC_API_URL=(https://researchgap-backend.onrender.com)
 Current frontend default:
 
 ```text
-https://research-gap-ai.vercel.app/
+(https://research-gap-ai.web.app/)
 ```
 
 For Google Cloud Run deployment, the backend should be deployed as a containerized FastAPI service with `GEMINI_API_KEY` configured as a secure environment variable.
