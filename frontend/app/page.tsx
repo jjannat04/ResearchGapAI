@@ -15,7 +15,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import type { ChangeEvent, DragEvent, FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 type Summary = {
   title: string;
@@ -25,6 +25,11 @@ type Summary = {
 };
 
 type ExtractedPaper = {
+  filename: string;
+  textLength: number;
+};
+
+type ExtractedPaperResponse = {
   filename: string;
   text: string;
 };
@@ -39,6 +44,14 @@ type ComparisonRow = {
 };
 
 type AnalysisResponse = {
+  extracted_papers: ExtractedPaperResponse[];
+  summaries: Summary[];
+  comparison_table: ComparisonRow[];
+  research_gaps: string[];
+  novel_ideas: string[];
+};
+
+type NormalizedAnalysis = {
   extracted_papers: ExtractedPaper[];
   summaries: Summary[];
   comparison_table: ComparisonRow[];
@@ -46,8 +59,11 @@ type AnalysisResponse = {
   novel_ideas: string[];
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://researchgap-backend.onrender.com";
 const loadingMessages = [
+  "Uploading files...",
+  "Analyzing papers...",
+  "Generating insights...",
   "Reading papers...",
   "Extracting insights...",
   "Comparing methodologies...",
@@ -57,15 +73,29 @@ const loadingMessages = [
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
-  const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [extractedPapers, setExtractedPapers] = useState<ExtractedPaper[]>([]);
+  const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [comparisonRows, setComparisonRows] = useState<ComparisonRow[]>([]);
+  const [researchGaps, setResearchGaps] = useState<string[]>([]);
+  const [novelIdeas, setNovelIdeas] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canAnalyze = useMemo(() => files.length > 0 && files.length <= 3 && !loading, [files, loading]);
   const uploadProgress = Math.min((files.length / 3) * 100, 100);
+  const hasResults = summaries.length > 0 || comparisonRows.length > 0 || researchGaps.length > 0 || novelIdeas.length > 0;
+
+  const clearResults = useCallback(() => {
+    setExtractedPapers([]);
+    setSummaries([]);
+    setComparisonRows([]);
+    setResearchGaps([]);
+    setNovelIdeas([]);
+  }, []);
 
   useEffect(() => {
     if (!loading) {
@@ -82,7 +112,7 @@ export default function Home() {
 
   function selectFiles(selectedFiles: File[]) {
     const selected = selectedFiles.filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
-    setResult(null);
+    clearResults();
     setError("");
 
     if (selected.length !== selectedFiles.length) {
@@ -125,7 +155,7 @@ export default function Home() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setResult(null);
+    clearResults();
 
     if (!canAnalyze) {
       setError("Select at least 1 PDF before analyzing.");
@@ -136,18 +166,37 @@ export default function Home() {
     files.forEach((file) => formData.append("files", file));
 
     setLoading(true);
+    setMessageIndex(0);
+    await nextFrame();
+
     try {
+      setMessageIndex(0);
       const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         body: formData,
       });
 
+      setMessageIndex(1);
+      await nextFrame();
+      const responseText = await response.text();
+
       if (!response.ok) {
-        const body = await response.json().catch(() => null);
+        const body = await parseJsonSafely(responseText);
         throw new Error(body?.detail ?? "Analysis failed.");
       }
 
-      setResult(await response.json());
+      setMessageIndex(2);
+      await nextFrame();
+      const payload = await parseJsonInWorker<AnalysisResponse>(responseText);
+      const normalized = normalizeAnalysis(payload);
+
+      await revealResults(normalized, startTransition, {
+        setExtractedPapers,
+        setSummaries,
+        setComparisonRows,
+        setResearchGaps,
+        setNovelIdeas,
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong.");
     } finally {
@@ -160,7 +209,7 @@ export default function Home() {
       <div className="border-b border-blue-100/70 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            
+            <Sparkles className="size-3.5" aria-hidden="true" />
             <span>Powered by Gemini API</span>
           </div>
           <div className="flex items-center gap-2 text-blue-50">
@@ -196,7 +245,7 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.22),transparent_34rem)]" />
         <div className="flex flex-col justify-center">
           <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700 shadow-sm">
-            
+            <Sparkles className="size-4" aria-hidden="true" />
             AI research copilot
           </div>
           <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl lg:leading-[1.02]">
@@ -322,15 +371,35 @@ export default function Home() {
       <section id="dashboard" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
         {loading && <LoadingState message={loadingMessages[messageIndex]} />}
 
-        {!loading && !result && (
+        {!loading && !hasResults && (
           <EmptyDashboard />
         )}
 
-        {result && (
+        {hasResults && (
           <div className="grid gap-8" aria-live="polite">
+            {extractedPapers.length > 0 && (
+              <ResultBlock eyebrow="Processed files" title="Uploaded Papers">
+                <div className="grid gap-4 md:grid-cols-3">
+                  {extractedPapers.map((paper) => (
+                    <article
+                      className="rounded-[1.5rem] border border-blue-100 bg-white p-5 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-950/10"
+                      key={paper.filename}
+                    >
+                      <div className="mb-4 grid size-11 place-items-center rounded-2xl bg-blue-50 text-blue-700">
+                        <FileText className="size-5" aria-hidden="true" />
+                      </div>
+                      <p className="truncate font-bold text-slate-950">{paper.filename}</p>
+                      <p className="mt-2 text-sm text-slate-500">{paper.textLength.toLocaleString()} characters extracted</p>
+                    </article>
+                  ))}
+                </div>
+              </ResultBlock>
+            )}
+
+            {summaries.length > 0 && (
             <ResultBlock eyebrow="Section 1" title="Paper Summaries">
               <div className="grid gap-5 lg:grid-cols-3">
-                {result.summaries.map((summary) => (
+                {summaries.map((summary) => (
                   <article
                     className="rounded-[1.75rem] border border-blue-100 bg-white p-6 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/10"
                     key={summary.title}
@@ -346,7 +415,9 @@ export default function Home() {
                 ))}
               </div>
             </ResultBlock>
+            )}
 
+            {comparisonRows.length > 0 && (
             <ResultBlock eyebrow="Section 2" title="Comparison Table">
               <div className="overflow-hidden rounded-[1.75rem] border border-blue-100 bg-white shadow-lg shadow-blue-950/5">
                 <div className="overflow-x-auto">
@@ -362,7 +433,7 @@ export default function Home() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-blue-50">
-                      {result.comparison_table.map((row) => (
+                      {comparisonRows.map((row) => (
                         <tr className="align-top transition hover:bg-blue-50/60" key={row.paper}>
                           <td className="px-5 py-4 font-bold text-slate-950">{row.paper}</td>
                           <td className="px-5 py-4 text-slate-600">{row.objective}</td>
@@ -377,10 +448,12 @@ export default function Home() {
                 </div>
               </div>
             </ResultBlock>
+            )}
 
+            {researchGaps.length > 0 && (
             <ResultBlock eyebrow="Section 3" title="Research Gaps">
               <div className="grid gap-4 md:grid-cols-2">
-                {result.research_gaps.map((gap, index) => (
+                {researchGaps.map((gap, index) => (
                   <article
                     className="group rounded-[1.75rem] border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-6 shadow-sm shadow-blue-950/5 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-amber-950/10"
                     key={gap}
@@ -396,10 +469,12 @@ export default function Home() {
                 ))}
               </div>
             </ResultBlock>
+            )}
 
+            {novelIdeas.length > 0 && (
             <ResultBlock eyebrow="Section 4" title="Novel Research Ideas">
               <div className="grid gap-5 lg:grid-cols-2">
-                {result.novel_ideas.map((idea, index) => (
+                {novelIdeas.map((idea, index) => (
                   <article
                     className="group relative overflow-hidden rounded-[1.75rem] border border-blue-100 bg-slate-950 p-6 text-white shadow-2xl shadow-blue-950/15 transition duration-300 hover:-translate-y-1 hover:shadow-blue-950/25"
                     key={idea}
@@ -419,6 +494,7 @@ export default function Home() {
                 ))}
               </div>
             </ResultBlock>
+            )}
           </div>
         )}
       </section>
@@ -512,4 +588,105 @@ function LoadingState({ message }: { message: string }) {
       </div>
     </div>
   );
+}
+
+function normalizeAnalysis(payload: AnalysisResponse): NormalizedAnalysis {
+  return {
+    extracted_papers: (payload.extracted_papers ?? []).map((paper) => ({
+      filename: paper.filename,
+      textLength: paper.text?.length ?? 0,
+    })),
+    summaries: payload.summaries ?? [],
+    comparison_table: payload.comparison_table ?? [],
+    research_gaps: payload.research_gaps ?? [],
+    novel_ideas: payload.novel_ideas ?? [],
+  };
+}
+
+async function revealResults(
+  data: NormalizedAnalysis,
+  startTransition: (callback: () => void) => void,
+  setters: {
+    setExtractedPapers: (papers: ExtractedPaper[]) => void;
+    setSummaries: (summaries: Summary[]) => void;
+    setComparisonRows: (rows: ComparisonRow[]) => void;
+    setResearchGaps: (gaps: string[]) => void;
+    setNovelIdeas: (ideas: string[]) => void;
+  },
+) {
+  startTransition(() => {
+    setters.setExtractedPapers(data.extracted_papers);
+    setters.setSummaries(data.summaries);
+  });
+
+  await delay(120);
+  startTransition(() => {
+    setters.setComparisonRows(data.comparison_table);
+  });
+
+  await delay(140);
+  startTransition(() => {
+    setters.setResearchGaps(data.research_gaps);
+  });
+
+  await delay(140);
+  startTransition(() => {
+    setters.setNovelIdeas(data.novel_ideas);
+  });
+}
+
+function parseJsonSafely(text: string): Promise<{ detail?: string } | null> {
+  return parseJsonInWorker<{ detail?: string }>(text).catch(() => null);
+}
+
+function parseJsonInWorker<T>(text: string): Promise<T> {
+  if (typeof Worker === "undefined" || typeof URL === "undefined" || typeof Blob === "undefined") {
+    return Promise.resolve(JSON.parse(text) as T);
+  }
+
+  const workerSource = `
+    self.onmessage = (event) => {
+      try {
+        self.postMessage({ ok: true, value: JSON.parse(event.data) });
+      } catch (error) {
+        self.postMessage({ ok: false, error: error instanceof Error ? error.message : "Invalid JSON" });
+      }
+    };
+  `;
+
+  return new Promise<T>((resolve, reject) => {
+    const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = (event: MessageEvent<{ ok: boolean; value?: T; error?: string }>) => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+
+      if (event.data.ok) {
+        resolve(event.data.value as T);
+      } else {
+        reject(new Error(event.data.error ?? "Invalid JSON"));
+      }
+    };
+
+    worker.onerror = (event) => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      reject(new Error(event.message));
+    };
+
+    worker.postMessage(text);
+  });
+}
+
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
