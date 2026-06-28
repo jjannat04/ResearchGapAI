@@ -160,7 +160,7 @@ export default function Home() {
       <div className="border-b border-blue-100/70 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-3.5" aria-hidden="true" />
+            
             <span>Powered by Gemini API</span>
           </div>
           <div className="flex items-center gap-2 text-blue-50">
@@ -196,15 +196,14 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.22),transparent_34rem)]" />
         <div className="flex flex-col justify-center">
           <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-sm font-semibold text-blue-700 shadow-sm">
-            <Sparkles className="size-4" aria-hidden="true" />
+            
             AI research copilot
           </div>
           <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl lg:leading-[1.02]">
             Turn papers into research direction.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-            Upload your PDFs and get concise summaries, side-by-side comparison, high-signal gaps, and novel ideas ready
-            for a hackathon demo or research pitch.
+            Upload your PDFs and get concise summaries, side-by-side comparison, high-signal gaps, and novel ideas.
           </p>
         </div>
 
