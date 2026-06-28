@@ -64,6 +64,36 @@ The frontend displays the result as a professional dashboard with separate secti
 - No database is used in the MVP.
 - Uploaded files and extracted text are processed per request and are not persisted.
 
+## How AGENTS.md Was Used
+
+`AGENTS.md` defines the project as a multi-agent workflow. Each agent owns a specific part of ResearchGap AI, which makes the implementation easier to review and keeps responsibilities clear.
+
+| Agent | Ownership | Contribution |
+| --- | --- | --- |
+| Frontend Agent | UI, upload flow, dashboard UX | Built the drag-and-drop PDF upload, loading states, responsive dashboard, and large-response frontend optimizations. |
+| Backend Agent | APIs and PDF processing | Built `POST /analyze`, PDF validation, `pypdf` extraction, and backend error handling. |
+| AI Agent | Gemini prompts and research analysis | Built the Gemini analysis pipeline, structured prompts, JSON schema output, and research gap generation. |
+| DevOps Agent | environment and deployment readiness | Defined `.env` usage, API URL configuration, and Google Cloud Run-ready deployment notes. |
+| Documentation Agent | submission and demo materials | Maintained README content, project explanation, technology mapping, and judge-facing documentation. |
+
+This makes `AGENTS.md` more than a label file: it explains how the work was divided and how each part of the final MVP maps to an accountable agent.
+
+## How SKILL.md Was Used
+
+`SKILL.md` maps the skills required for the project to the features implemented in the MVP.
+
+| Skill | Feature supported |
+| --- | --- |
+| Python | Backend logic, PDF processing, Gemini request handling |
+| FastAPI | API endpoint and request validation |
+| Next.js | Frontend application and deployment-ready UI |
+| Gemini API | Summaries, comparison, research gaps, and novel ideas |
+| PDF Processing | Extracting selectable text from uploaded PDFs |
+| Docker | Container deployment readiness |
+| Google Cloud Run | Cloud deployment target for the backend |
+
+The skill workflow follows five stages: define the feature, build the implementation, review code, test locally, and deploy/demo. This gives reviewers a clear line from listed skills to actual project outcomes.
+
 ## Gemini API Usage
 
 Gemini is used in the backend analysis pipeline inside:

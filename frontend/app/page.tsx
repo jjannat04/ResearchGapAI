@@ -487,9 +487,7 @@ export default function Home() {
                       <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-blue-100">Idea {index + 1}</span>
                     </div>
                     <p className="relative text-base leading-8 text-blue-50">{idea}</p>
-                    <div className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-blue-200">
-                      Explore direction <ArrowRight className="size-4 transition group-hover:translate-x-1" aria-hidden="true" />
-                    </div>
+                    
                   </article>
                 ))}
               </div>
