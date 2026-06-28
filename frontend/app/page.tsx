@@ -60,15 +60,17 @@ type NormalizedAnalysis = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://researchgap-backend.onrender.com";
-const loadingMessages = [
+const pipelineStages = [
+  "Uploading files",
+  "Extracting text",
+  "AI analysis",
+  "Generating output",
+];
+const pipelineMessages = [
   "Uploading files...",
-  "Analyzing papers...",
-  "Generating insights...",
-  "Reading papers...",
-  "Extracting insights...",
-  "Comparing methodologies...",
-  "Finding research gaps...",
-  "Generating novel ideas...",
+  "Extracting text from your PDFs...",
+  "Running Gemini analysis...",
+  "Preparing your dashboard...",
 ];
 
 export default function Home() {
@@ -81,7 +83,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [messageIndex, setMessageIndex] = useState(0);
+  const [currentStageIndex, setCurrentStageIndex] = useState(0);
   const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,15 +101,22 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading) {
-      setMessageIndex(0);
+      setCurrentStageIndex(0);
       return;
     }
 
-    const interval = window.setInterval(() => {
-      setMessageIndex((current) => (current + 1) % loadingMessages.length);
-    }, 1600);
+    const timers = [
+      window.setTimeout(() => {
+        setCurrentStageIndex((current) => Math.max(current, 1));
+      }, 4000),
+      window.setTimeout(() => {
+        setCurrentStageIndex((current) => Math.max(current, 2));
+      }, 18000),
+    ];
 
-    return () => window.clearInterval(interval);
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   }, [loading]);
 
   function selectFiles(selectedFiles: File[]) {
@@ -166,17 +175,17 @@ export default function Home() {
     files.forEach((file) => formData.append("files", file));
 
     setLoading(true);
-    setMessageIndex(0);
+    setCurrentStageIndex(0);
     await nextFrame();
 
     try {
-      setMessageIndex(0);
+      setCurrentStageIndex(0);
       const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         body: formData,
       });
 
-      setMessageIndex(1);
+      setCurrentStageIndex((current) => Math.max(current, 1));
       await nextFrame();
       const responseText = await response.text();
 
@@ -185,7 +194,7 @@ export default function Home() {
         throw new Error(body?.detail ?? "Analysis failed.");
       }
 
-      setMessageIndex(2);
+      setCurrentStageIndex(pipelineStages.length - 1);
       await nextFrame();
       const payload = await parseJsonInWorker<AnalysisResponse>(responseText);
       const normalized = normalizeAnalysis(payload);
@@ -369,7 +378,12 @@ export default function Home() {
       </section>
 
       <section id="dashboard" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-        {loading && <LoadingState message={loadingMessages[messageIndex]} />}
+        {loading && (
+          <div className="grid gap-5">
+            <AnalysisProgress currentStageIndex={currentStageIndex} />
+            <LoadingState message={pipelineMessages[currentStageIndex]} currentStep={pipelineStages[currentStageIndex]} />
+          </div>
+        )}
 
         {!loading && !hasResults && (
           <EmptyDashboard />
@@ -549,7 +563,64 @@ function SummaryItem({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-function LoadingState({ message }: { message: string }) {
+function AnalysisProgress({ currentStageIndex }: { currentStageIndex: number }) {
+  const progress = ((currentStageIndex + 1) / pipelineStages.length) * 100;
+
+  return (
+    <section className="rounded-[2rem] border border-blue-100 bg-white p-5 shadow-lg shadow-blue-950/5" aria-live="polite">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-wide text-blue-600">Analysis progress</p>
+          <h2 className="mt-1 text-xl font-extrabold tracking-tight text-slate-950">{pipelineStages[currentStageIndex]}</h2>
+        </div>
+        <p className="text-sm font-bold text-slate-500">
+          Stage {currentStageIndex + 1} of {pipelineStages.length}
+        </p>
+      </div>
+
+      <div className="h-2 overflow-hidden rounded-full bg-blue-50" role="progressbar" aria-valuemin={1} aria-valuemax={pipelineStages.length} aria-valuenow={currentStageIndex + 1}>
+        <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-400 transition-all duration-700" style={{ width: `${progress}%` }} />
+      </div>
+
+      <ol className="mt-5 grid gap-3 md:grid-cols-4">
+        {pipelineStages.map((step, index) => {
+          const isComplete = index < currentStageIndex;
+          const isActive = index === currentStageIndex;
+
+          return (
+            <li
+              className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                isActive
+                  ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
+                  : isComplete
+                    ? "border-blue-100 bg-white text-slate-600"
+                    : "border-slate-100 bg-slate-50 text-slate-400"
+              }`}
+              key={step}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : isComplete
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-white text-slate-400"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function LoadingState({ message, currentStep }: { message: string; currentStep: string }) {
   return (
     <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl shadow-blue-950/10">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -559,19 +630,19 @@ function LoadingState({ message }: { message: string }) {
             <span className="absolute inset-0 animate-ping rounded-3xl bg-blue-500/20" />
           </div>
           <div>
-            <p className="text-lg font-extrabold text-slate-950">{message}</p>
+            <p className="text-lg font-extrabold text-slate-950">Analyzing your research papers...</p>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              ResearchGap AI is building your structured dashboard.
+              Current step: <span className="font-semibold text-blue-700">{currentStep}</span>
             </p>
           </div>
         </div>
         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">
-          Premium analysis in progress
+          {message}
         </div>
       </div>
 
       <div className="mt-6 h-2 overflow-hidden rounded-full bg-blue-50">
-        <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600" />
+        <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600" />
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">

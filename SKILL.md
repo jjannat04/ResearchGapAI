@@ -17,7 +17,7 @@ This file maps the technical skills used in ResearchGap AI to the actual project
 | PDF Processing | `backend/app/services/pdf_utils.py` | Extracts text from uploaded PDFs using `pypdf`. |
 | pypdf | PDF text extraction | Reads uploaded PDF bytes and extracts selectable text for analysis. |
 | Docker | Deployment readiness | The backend structure is compatible with containerized deployment workflows. |
-| Google Cloud Run | Deployment target | The project is designed to run the backend as a cloud-hosted FastAPI service with environment variables. |
+| Cloud Run compatible | Deployment target | The project is designed to run the backend as a cloud-hosted FastAPI service with environment variables. |
 | Render / Vercel | Current hosting path | Frontend and backend URLs are configured for public demo deployment. |
 
 ## Workflow
@@ -76,7 +76,7 @@ This skill chain is what turns static PDFs into actionable research outputs:
 | Frontend Agent | Next.js, React, TypeScript, Tailwind CSS |
 | Backend Agent | Python, FastAPI, pypdf, API validation |
 | AI Agent | Gemini API, google-genai, prompt engineering, JSON schema output |
-| DevOps Agent | environment variables, deployment readiness, Cloud Run workflow |
+| DevOps Agent | environment variables, deployment readiness, Cloud Run deployment-ready structure |
 | Documentation Agent | README writing, demo explanation, project traceability |
 
 ## Review Checklist
