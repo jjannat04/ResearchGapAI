@@ -13,13 +13,12 @@ from google.genai import types
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
-DEFAULT_MODEL = "gemini-2.5-flash"
-GEMINI_TIMEOUT_SECONDS = 75
-MAX_TOTAL_CHARS_TO_GEMINI = 30000
-TRUNCATION_MARKER = "\n[Text truncated before Gemini analysis.]"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
+GEMINI_TIMEOUT_SECONDS = 90
+MAX_TOTAL_CHARS_TO_GEMINI = 50000
+TRUNCATION_MARKER = "\n[Text truncated before Gemini analysis.]\n"
 RATE_LIMIT_MESSAGE = "The AI service is currently experiencing high demand. Please try again in a few minutes."
 TIMEOUT_MESSAGE = "The AI service took too long to respond. Please try again in a few minutes."
-
 logger = logging.getLogger(__name__)
 
 
@@ -118,14 +117,21 @@ def analyze_papers(texts: list[str]) -> dict[str, list]:
             contents=_build_prompt(limited_texts),
             config=types.GenerateContentConfig(
                 systemInstruction=(
-                    "You are ResearchGap AI, an expert academic research assistant. "
-                    "Analyze papers precisely and return only valid JSON."
-                ),
+                                "You are ResearchGap AI, an expert academic research assistant. "
+                                "Base every statement strictly on the provided paper text. "
+                                "Do not fabricate details or citations. "
+                                "Return only valid JSON matching the provided schema."
+                            ),
                 responseMimeType="application/json",
                 responseJsonSchema=ANALYSIS_SCHEMA,
                 temperature=0.2,
             ),
+
         )
+        if not getattr(response, "text", None):
+            raise AnalysisError(
+                "The AI service returned an empty response. Please try again."
+            )
     except genai_errors.ClientError as exc:
         logger.exception("Gemini client request failed.", extra=_elapsed_context(log_context, started_at))
         if _is_rate_limit_error(exc):
@@ -192,21 +198,40 @@ def _build_prompt(texts: list[str]) -> str:
 def _limit_total_text(texts: list[str]) -> list[str]:
     cleaned = [" ".join(text.split()) for text in texts]
     total_length = sum(len(text) for text in cleaned)
+
     if total_length <= MAX_TOTAL_CHARS_TO_GEMINI:
         return cleaned
 
-    per_paper_limit = max(1, MAX_TOTAL_CHARS_TO_GEMINI // len(cleaned))
+    per_paper_limit = max(
+        1,
+        MAX_TOTAL_CHARS_TO_GEMINI // len(cleaned),
+    )
+
     limited = []
+
     for text in cleaned:
         if len(text) <= per_paper_limit:
             limited.append(text)
-        elif per_paper_limit <= len(TRUNCATION_MARKER):
+            continue
+
+        if per_paper_limit <= len(TRUNCATION_MARKER):
             limited.append(text[:per_paper_limit])
-        else:
-            limited.append(text[: per_paper_limit - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER)
+            continue
+
+        head = per_paper_limit // 2
+        tail = (
+            per_paper_limit
+            - head
+            - len(TRUNCATION_MARKER)
+        )
+
+        limited.append(
+            text[:head]
+            + TRUNCATION_MARKER
+            + text[-tail:]
+        )
 
     return limited
-
 
 def _is_rate_limit_error(exc: Exception) -> bool:
     status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
