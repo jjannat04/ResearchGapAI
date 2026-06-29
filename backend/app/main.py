@@ -1,13 +1,21 @@
+import asyncio
 import logging
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services.analyzer import AnalysisError, GeminiRateLimitError, analyze_papers
+from app.services.analyzer import (
+    GEMINI_TIMEOUT_SECONDS,
+    AnalysisError,
+    GeminiRateLimitError,
+    GeminiTimeoutError,
+    analyze_papers,
+)
 from app.services.pdf_utils import PDFExtractionError, extract_pdf_text
 
 logger = logging.getLogger(__name__)
 AI_ANALYSIS_ERROR_MESSAGE = "The AI service could not complete the analysis. Please try again later."
+AI_ANALYSIS_TIMEOUT_MESSAGE = "The AI service took too long to respond. Please try again in a few minutes."
 
 app = FastAPI(title="ResearchGap AI API", version="0.1.0")
 
@@ -62,10 +70,16 @@ async def analyze(files: list[UploadFile] = File(...)) -> dict[str, object]:
         extracted_papers.append({"filename": filename, "text": text})
 
     try:
-        analysis = analyze_papers([paper["text"] for paper in extracted_papers])
+        analysis = await asyncio.wait_for(
+            asyncio.to_thread(analyze_papers, [paper["text"] for paper in extracted_papers]),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
     except GeminiRateLimitError as exc:
         logger.warning("Gemini API rate limit reached.", exc_info=True)
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except (GeminiTimeoutError, asyncio.TimeoutError) as exc:
+        logger.warning("Gemini analysis timed out.", exc_info=True)
+        raise HTTPException(status_code=504, detail=AI_ANALYSIS_TIMEOUT_MESSAGE) from exc
     except AnalysisError as exc:
         logger.exception("AI analysis failed.")
         raise HTTPException(status_code=502, detail=AI_ANALYSIS_ERROR_MESSAGE) from exc

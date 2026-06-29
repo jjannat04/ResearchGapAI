@@ -73,6 +73,9 @@ const pipelineMessages = [
   "Running Gemini analysis...",
   "Preparing your dashboard...",
 ];
+const ANALYSIS_REQUEST_TIMEOUT_MS = 90000;
+const ANALYSIS_TIMEOUT_MESSAGE =
+  "Analysis is taking longer than expected. Please try again with a smaller PDF or try again in a few minutes.";
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -179,11 +182,17 @@ export default function Home() {
     setCurrentStageIndex(0);
     await nextFrame();
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, ANALYSIS_REQUEST_TIMEOUT_MS);
+
     try {
       setCurrentStageIndex(0);
       const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
 
       setCurrentStageIndex((current) => Math.max(current, 1));
@@ -208,8 +217,9 @@ export default function Home() {
         setNovelIdeas,
       });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong.");
+      setError(isAbortError(caught) ? ANALYSIS_TIMEOUT_MESSAGE : caught instanceof Error ? caught.message : "Something went wrong.");
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }
@@ -765,4 +775,8 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }

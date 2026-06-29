@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,10 +13,12 @@ from google.genai import types
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-2.5-flash"
+GEMINI_TIMEOUT_SECONDS = 75
 MAX_TOTAL_CHARS_TO_GEMINI = 30000
 TRUNCATION_MARKER = "\n[Text truncated before Gemini analysis.]"
 RATE_LIMIT_MESSAGE = "The AI service is currently experiencing high demand. Please try again in a few minutes."
+TIMEOUT_MESSAGE = "The AI service took too long to respond. Please try again in a few minutes."
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,10 @@ class AnalysisError(RuntimeError):
 
 
 class GeminiRateLimitError(AnalysisError):
+    pass
+
+
+class GeminiTimeoutError(AnalysisError):
     pass
 
 
@@ -88,9 +95,22 @@ def analyze_papers(texts: list[str]) -> dict[str, list]:
     if not api_key:
         raise AnalysisError("GEMINI_API_KEY is missing. Add it to backend/.env and restart the server.")
 
+    started_at = time.monotonic()
     limited_texts = _limit_total_text(texts)
-    client = genai.Client(api_key=api_key)
+    limited_text_size = sum(len(text) for text in limited_texts)
     model = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT_SECONDS * 1000),
+    )
+    log_context = {
+        "gemini_model": model,
+        "paper_count": len(limited_texts),
+        "limited_text_size": limited_text_size,
+        "timeout_seconds": GEMINI_TIMEOUT_SECONDS,
+    }
+
+    logger.info("Starting Gemini analysis.", extra=log_context)
 
     try:
         response = client.models.generate_content(
@@ -107,21 +127,34 @@ def analyze_papers(texts: list[str]) -> dict[str, list]:
             ),
         )
     except genai_errors.ClientError as exc:
-        logger.exception("Gemini client request failed.")
+        logger.exception("Gemini client request failed.", extra=_elapsed_context(log_context, started_at))
         if _is_rate_limit_error(exc):
             raise GeminiRateLimitError(RATE_LIMIT_MESSAGE) from exc
+        if _is_timeout_error(exc):
+            raise GeminiTimeoutError(TIMEOUT_MESSAGE) from exc
         raise AnalysisError("Gemini request failed. Please try again later.") from exc
     except genai_errors.ServerError as exc:
-        logger.exception("Gemini service returned a server error.")
+        logger.exception("Gemini service returned a server error.", extra=_elapsed_context(log_context, started_at))
+        if _is_timeout_error(exc):
+            raise GeminiTimeoutError(TIMEOUT_MESSAGE) from exc
         raise AnalysisError("Gemini service is temporarily unavailable. Try again shortly.") from exc
     except genai_errors.APIError as exc:
-        logger.exception("Gemini API request failed.")
+        logger.exception("Gemini API request failed.", extra=_elapsed_context(log_context, started_at))
         if _is_rate_limit_error(exc):
             raise GeminiRateLimitError(RATE_LIMIT_MESSAGE) from exc
+        if _is_timeout_error(exc):
+            raise GeminiTimeoutError(TIMEOUT_MESSAGE) from exc
         raise AnalysisError("Gemini API error. Please try again later.") from exc
     except Exception as exc:
-        logger.exception("Unexpected Gemini analysis failure.")
+        logger.exception("Unexpected Gemini analysis failure.", extra=_elapsed_context(log_context, started_at))
+        if _is_timeout_error(exc):
+            raise GeminiTimeoutError(TIMEOUT_MESSAGE) from exc
         raise AnalysisError("Gemini analysis failed. Please try again later.") from exc
+
+    logger.info(
+        "Gemini analysis completed.",
+        extra=_elapsed_context(log_context, started_at),
+    )
 
     try:
         data = json.loads(response.text or "")
@@ -189,6 +222,20 @@ def _is_rate_limit_error(exc: Exception) -> bool:
         or "resource exhausted" in message
         or "too many requests" in message
     )
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if str(status_code) in {"408", "504"}:
+        return True
+
+    name = type(exc).__name__.lower()
+    message = str(exc).lower()
+    return "timeout" in name or "timed out" in message or "read timeout" in message
+
+
+def _elapsed_context(context: dict[str, object], started_at: float) -> dict[str, object]:
+    return {**context, "elapsed_seconds": round(time.monotonic() - started_at, 2)}
 
 
 def _validate_analysis(data: Any) -> dict[str, list]:
