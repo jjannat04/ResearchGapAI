@@ -271,7 +271,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2 text-blue-50">
             <Cloud className="size-3.5" aria-hidden="true" />
-            <span>Deployed on Google Cloud Run</span>
+            <span>Deployed on Firebase</span>
           </div>
         </div>
       </div>
