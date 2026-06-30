@@ -45,6 +45,7 @@ type ComparisonRow = {
 };
 
 type AnalysisResponse = {
+  gemini_model: string;
   extracted_papers: ExtractedPaperResponse[];
   summaries: Summary[];
   comparison_table: ComparisonRow[];
@@ -52,7 +53,13 @@ type AnalysisResponse = {
   novel_ideas: string[];
 };
 
+type BackendConfigResponse = {
+  gemini_models?: string[];
+  active_model?: string;
+};
+
 type NormalizedAnalysis = {
+  gemini_model: string;
   extracted_papers: ExtractedPaper[];
   summaries: Summary[];
   comparison_table: ComparisonRow[];
@@ -88,6 +95,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
+  const [activeGeminiModel, setActiveGeminiModel] = useState("");
+  const [configuredGeminiModelCount, setConfiguredGeminiModelCount] = useState(1);
   const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -101,6 +110,31 @@ export default function Home() {
     setComparisonRows([]);
     setResearchGaps([]);
     setNovelIdeas([]);
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    fetch(`${API_URL}/config`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((config: BackendConfigResponse | null) => {
+        if (ignore || !config) {
+          return;
+        }
+
+        const modelCount = config.gemini_models?.length ?? 0;
+        setActiveGeminiModel(config.active_model ?? config.gemini_models?.[0] ?? "");
+        setConfiguredGeminiModelCount(Math.max(1, modelCount));
+      })
+      .catch(() => {
+        if (!ignore) {
+          setActiveGeminiModel("");
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -185,7 +219,7 @@ export default function Home() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       controller.abort();
-    }, ANALYSIS_REQUEST_TIMEOUT_MS);
+    }, ANALYSIS_REQUEST_TIMEOUT_MS * configuredGeminiModelCount);
 
     try {
       setCurrentStageIndex(0);
@@ -208,6 +242,7 @@ export default function Home() {
       await nextFrame();
       const payload = await parseJsonInWorker<AnalysisResponse>(responseText);
       const normalized = normalizeAnalysis(payload);
+      setActiveGeminiModel(normalized.gemini_model);
 
       await revealResults(normalized, startTransition, {
         setExtractedPapers,
@@ -230,7 +265,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             
-            <span>Powered by Gemini API</span>
+            <span>
+              Powered by Gemini API{activeGeminiModel ? <> &bull; {activeGeminiModel}</> : null}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-blue-50">
             <Cloud className="size-3.5" aria-hidden="true" />
@@ -678,6 +715,7 @@ function LoadingState({ message, currentStep }: { message: string; currentStep: 
 
 function normalizeAnalysis(payload: AnalysisResponse): NormalizedAnalysis {
   return {
+    gemini_model: payload.gemini_model ?? "",
     extracted_papers: (payload.extracted_papers ?? []).map((paper) => ({
       filename: paper.filename,
       textLength: paper.text?.length ?? 0,

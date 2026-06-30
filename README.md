@@ -48,8 +48,7 @@ The frontend displays the result as a professional dashboard with separate secti
 ### AI/API
 
 - Gemini API
-- Model configured through `GEMINI_MODEL`
-- Default model: `gemini-2.5-flash`
+- Ordered model fallback configured through `GEMINI_MODELS`
 
 ### Deployment
 
@@ -114,6 +113,14 @@ The backend reads the API key from:
 backend/.env
 ```
 
+The backend reads the ordered Gemini model fallback list from:
+
+```text
+GEMINI_MODELS
+```
+
+If `GEMINI_MODELS` is not set, the backend can still read the legacy `GEMINI_MODEL` variable as a single-model configuration. Successful analysis responses include `gemini_model`, so the frontend can display the exact model that completed the request without hardcoding model names.
+
 
 ## Best Use of Gemini API
 
@@ -149,6 +156,7 @@ Expected response:
 
 ```json
 {
+  "gemini_model": "model-used-by-backend",
   "summaries": [
     {
       "title": "",
@@ -215,12 +223,15 @@ Current frontend default:
 ```
 
 For Google Cloud Run deployment, the backend should be deployed as a containerized FastAPI service with `GEMINI_API_KEY` configured as a secure environment variable.
+Configure `GEMINI_MODELS` as a comma-separated list in the backend environment to enable automatic fallback when a model is rate-limited or temporarily unavailable.
 
 ## Error Handling
 
 Backend error handling includes:
 
 - missing Gemini API key
+- missing Gemini model configuration
+- Gemini model fallback for rate limits, timeouts, and service/API availability errors
 - Gemini client/server/API errors
 - invalid JSON returned from Gemini
 - missing response fields

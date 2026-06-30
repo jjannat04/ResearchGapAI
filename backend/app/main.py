@@ -5,15 +5,18 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.analyzer import (
-    GEMINI_TIMEOUT_SECONDS,
     AnalysisError,
+    GeminiConfigurationError,
     GeminiRateLimitError,
     GeminiTimeoutError,
     analyze_papers,
+    get_analysis_timeout_seconds,
+    get_gemini_config,
 )
 from app.services.pdf_utils import PDFExtractionError, extract_pdf_text
 
 logger = logging.getLogger(__name__)
+AI_CONFIGURATION_ERROR_MESSAGE = "The AI service is not configured. Please contact the site owner."
 AI_ANALYSIS_ERROR_MESSAGE = "The AI service could not complete the analysis. Please try again later."
 AI_ANALYSIS_TIMEOUT_MESSAGE = "The AI service took too long to respond. Please try again in a few minutes."
 
@@ -37,6 +40,15 @@ def root():
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/config")
+def config() -> dict[str, object]:
+    try:
+        return get_gemini_config()
+    except GeminiConfigurationError as exc:
+        logger.exception("Gemini model configuration is missing.")
+        raise HTTPException(status_code=500, detail=AI_CONFIGURATION_ERROR_MESSAGE) from exc
 
 
 @app.post("/analyze")
@@ -70,9 +82,10 @@ async def analyze(files: list[UploadFile] = File(...)) -> dict[str, object]:
         extracted_papers.append({"filename": filename, "text": text})
 
     try:
+        analysis_timeout_seconds = get_analysis_timeout_seconds()
         analysis = await asyncio.wait_for(
             asyncio.to_thread(analyze_papers, [paper["text"] for paper in extracted_papers]),
-            timeout=GEMINI_TIMEOUT_SECONDS,
+            timeout=analysis_timeout_seconds,
         )
     except GeminiRateLimitError as exc:
         logger.warning("Gemini API rate limit reached.", exc_info=True)
@@ -80,6 +93,9 @@ async def analyze(files: list[UploadFile] = File(...)) -> dict[str, object]:
     except (GeminiTimeoutError, asyncio.TimeoutError) as exc:
         logger.warning("Gemini analysis timed out.", exc_info=True)
         raise HTTPException(status_code=504, detail=AI_ANALYSIS_TIMEOUT_MESSAGE) from exc
+    except GeminiConfigurationError as exc:
+        logger.exception("Gemini model configuration is missing.")
+        raise HTTPException(status_code=500, detail=AI_CONFIGURATION_ERROR_MESSAGE) from exc
     except AnalysisError as exc:
         logger.exception("AI analysis failed.")
         raise HTTPException(status_code=502, detail=AI_ANALYSIS_ERROR_MESSAGE) from exc

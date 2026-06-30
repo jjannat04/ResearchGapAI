@@ -65,7 +65,7 @@ This project was organized using a multi-agent workflow. Each agent owns a clear
 
 **Project deliverables:**
 - environment variable pattern using `.env`
-- `GEMINI_API_KEY` and `GEMINI_MODEL` configuration
+- `GEMINI_API_KEY` and `GEMINI_MODELS` configuration
 - frontend API URL configuration with `NEXT_PUBLIC_API_URL`
 - deployment-ready FastAPI and Next.js structure
 - public UI badge showing Gemini API and Google Cloud Run deployment intent
