@@ -123,7 +123,6 @@ export default function Home() {
         }
 
         const modelCount = config.gemini_models?.length ?? 0;
-        setActiveGeminiModel(config.active_model ?? config.gemini_models?.[0] ?? "");
         setConfiguredGeminiModelCount(Math.max(1, modelCount));
       })
       .catch(() => {
@@ -203,6 +202,7 @@ export default function Home() {
     event.preventDefault();
     setError("");
     clearResults();
+    setActiveGeminiModel("");
 
     if (!canAnalyze) {
       setError("Select at least 1 PDF before analyzing.");
